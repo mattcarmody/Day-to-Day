@@ -1,46 +1,73 @@
-#!python3
-# spgMin.py - Command line program to tally up SPG spending via txt file.
-# If called prints total to date, if passed a new purchase adds it to doc and sums a new total.
+#!/usr/bin/env python3
+# spgMin.py - Script that tracks minimum spend via automated AMEX emails.
 
-import sys
+import imapclient
+import openpyxl 
+import pyzmail
+import re
 
-# Open txt file and read in purchase history.
-spgFile1 = open('C:\\Users\\Papa\\Documents\\mattPython\\spgMin.txt')
-spgContent1 = spgFile1.readlines()
-# enter log print here
+purchaseRegex = re.compile(r'''(
+	\n\n 
+	(.*)	# Group 2 - Store
+	\n\$
+	(\S+)	# Group 3 - Purchase Amount
+	\*\n
+	(.*)	# Group 4 - Date
+	\n\n
+	)''', re.VERBOSE)
 
-# Sum previous spend and print to user.
-total1 = 0.0
-for i in range(2, len(spgContent1)):
-    strLen = len(spgContent1[i])
-    total1 += float(spgContent1[i][0:(strLen-1)])
-print('Before today spend was $' + str(round(total1, 2)))
-spgFile1.close()
+conn = imapclient.IMAPClient('imap.gmail.com', ssl=True)
+conn.login(input('email'), input('passwd'))
 
-# If the command line call passed a purchase value, add it and print the new total.
-if len(sys.argv) > 1:
-    # Update user.
-    print('Writing in new purchase...')
+# Pull out emails.
+conn.select_folder('Finance/American Express', readonly=True)
+UIDs = conn.search(['SINCE', '12-Jan-2017', 'SUBJECT', 'Large Purchase Approved', 'BODY', 'Starwood Preferred Guest'])
 
-    # Append current purchase to txt file from command line call.
-    spgFile2 = open('C:\\Users\\Papa\\Documents\\mattPython\\spgMin.txt', 'a')
-    spgFile2.write(str(sys.argv[1]) + '\n')
-    spgFile2.close()
-    # how to verify that this worked?
+# Loop over emails
+for i in range(len(UIDs)):
+    rawMessage = conn.fetch([UIDs[i]], ['BODY[]', 'FLAGS'])
 
-    # Update user.
-    print('Successfully written in.')
-
-    # Open txt file and read in updated purchase history.
-    spgFile3 = open('C:\\Users\\Papa\\Documents\\mattPython\\spgMin.txt')
-    spgContent3 = spgFile3.readlines()
-    # log print here
-
-    # Sum updated spend and print to user.
-    total3 = 0.0
-    for i in range(2, len(spgContent3)):
-        strLen3 = len(spgContent3[i])
-        total3 += float(spgContent3[i][0:(strLen3-1)])
-    print('Total spent is now $' + str(round(total3, 2)))
-    spgFile3.close()
+	# Extract email text.
+    message = pyzmail.PyzMessage.factory(rawMessage[UIDs[i]][b'BODY[]'])
+    payloadText = message.text_part.get_payload().decode('UTF-8')
     
+    # TEMP: Save text to .txt file and then read it back in.
+    # Without doing this, regex won't find match in payloadText. Why??
+    amexTextFile = open('/home/matt/amexProject/amexText.txt', 'w')
+    amexTextFile.write(payloadText) 
+    amexTextFile.close()
+    amexTextFile2 = open('/home/matt/amexProject/amexText.txt', 'r')
+    amexText = amexTextFile2.read()
+    
+	# Extract the purchase info and store in spreadsheet.
+    mo = purchaseRegex.search(payloadText)
+    if mo:
+        print(mo.group(2))
+        print(mo.group(3))
+        print(mo.group(4))
+        
+        wb = openpyxl.load_workbook('spgMinData.xlsx')
+        sheet = wb.active
+        newLine = sheet.max_row + 1
+        sheet.cell(row=newLine, column=1).value = mo.group(2)
+        sheet.cell(row=newLine, column=2).value = float(mo.group(3))
+        sheet.cell(row=newLine, column=3).value = mo.group(4)
+        wb.save('spgMinData.xlsx')    
+    else:
+        print('No match.')
+
+# Sum up spending to date.
+wb = openpyxl.load_workbook('spgMinData.xlsx')
+sheet = wb.active
+total = 0.0
+for i in range(2, sheet.max_row + 1):
+    total += float(sheet['B' + str(i)].value)
+
+# Print status of spending.
+if total >= 1000:
+    print("Congratulations! You met your minimum spend of $1000. "
+        "You've spent $" + str(total))
+else:
+    print("You've spent $" + str(total) + " so far. You have until February.")
+
+conn.logout()

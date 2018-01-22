@@ -13,3 +13,6 @@ Instead of logging in to AMEX and mentally tallying purchases since a particular
 I've found that starting my day in a positive, productive way makes a world of difference over the course of the entire day. 
 This script is run every morning (with cron) and serves as my alarm clock. 
 It sets the computer to full volume and launches a YouTube video of my choice that sets the tone for my morning.
+
+# Trackr
+Visually tracking my progress helps me stay on track with long term learning goals. This script monitors my progress on some of the sites I use regularly. It runs daily using cron and logs my progress on Duolingo, Codewars, Chess.com & Goodreads. Data is being kept and visualized in a .xlsx spreadsheet at the moment.

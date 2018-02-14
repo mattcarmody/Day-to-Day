@@ -6,6 +6,8 @@ import openpyxl
 import pyzmail
 import re
 
+TXT_FILE = 'amexText.txt'
+
 purchaseRegex = re.compile(r'''(
 	\n\n 
 	(.*)	# Group 2 - Store
@@ -33,10 +35,10 @@ for i in range(len(UIDs)):
     
     # TEMP: Save text to .txt file and then read it back in.
     # Without doing this, regex won't find match in payloadText. Why??
-    amexTextFile = open('/home/matt/amexProject/amexText.txt', 'w')
+    amexTextFile = open(TXT_FILE, 'w')
     amexTextFile.write(payloadText) 
     amexTextFile.close()
-    amexTextFile2 = open('/home/matt/amexProject/amexText.txt', 'r')
+    amexTextFile2 = open(TXT_FILE, 'r')
     amexText = amexTextFile2.read()
     
 	# Extract the purchase info and store in spreadsheet.
@@ -61,13 +63,13 @@ wb = openpyxl.load_workbook('spgMinData.xlsx')
 sheet = wb.active
 total = 0.0
 for i in range(2, sheet.max_row + 1):
-    total += float(sheet['B' + str(i)].value)
+    total += float(sheet['B{}'.format(i)].value)
 
 # Print status of spending.
 if total >= 1000:
     print("Congratulations! You met your minimum spend of $1000. "
-        "You've spent $" + str(total))
+        "You've spent ${}".format(total))
 else:
-    print("You've spent $" + str(total) + " so far. You have until February.")
+    print("You've spent ${} so far. You have until February.".format(total))
 
 conn.logout()
